@@ -1,0 +1,60 @@
+-- flight counts for each year
+SELECT year, COUNT(*) from airlines GROUP BY year;
+
+-- flight counts for each month by year
+INSERT OVERWRITE LOCAL DIRECTORY 'flightCountsByYearMonth'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+SELECT year, month, COUNT(*) from airlines GROUP BY year, month ORDER BY year, month;
+
+-- flight counts for each day of the week by year
+INSERT OVERWRITE LOCAL DIRECTORY 'flightCountsByYearDayOfWeek'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+SELECT year, dayOfWeek, COUNT(*) from airlines GROUP BY year, dayOfWeek ORDER BY year, dayOfWeek;
+
+-- flight counts and airports served for each carrier by year and save to 'carrierCountsByYear'
+INSERT OVERWRITE LOCAL DIRECTORY 'carrierCountsByYear'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+SELECT counts.*, carriers.description FROM (
+  SELECT year, uniqueCarrier, COUNT(*) AS total, COUNT(DISTINCT(origin)) AS airports
+  FROM airlines GROUP BY year, uniqueCarrier
+) counts, carriers WHERE counts.uniqueCarrier = carriers.code
+ORDER BY counts.year DESC;
+
+-- manufacturer statistics
+INSERT OVERWRITE LOCAL DIRECTORY 'manufacturersUsedByCarriers'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+SELECT result.year, result.manufacturer, AVG(result.crsElapsedTime), COUNT(DISTINCT(result.uniqueCarrier))
+FROM (
+  SELECT airlines.year, airlines.tailNum, airlines.uniqueCarrier, airlines.crsElapsedTime, planes.manufacturer
+  FROM airlines, planes
+  WHERE airlines.tailNum = planes.tailNum and planes.manufacturer != "\N"
+) result
+GROUP BY result.year, result.manufacturer;
+
+-- number of flights by month by carriers
+INSERT OVERWRITE LOCAL DIRECTORY 'yearMonthCarriers'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+SELECT results.*, COUNT(*)
+FROM (
+  SELECT airlines.year, airlines.month, carriers.description
+  FROM airlines, carriers
+  WHERE airlines.uniqueCarrier = carriers.code
+) results
+GROUP BY results.year, results.month, results.description;
+
+-- number of flights by month by airport states
+INSERT OVERWRITE LOCAL DIRECTORY 'yearMonthAirportStates'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+SELECT results.*, COUNT(*)
+FROM (
+  SELECT airlines.year, airlines.month, airports.state
+  FROM airlines, airports
+  WHERE airlines.dest = airports.iata
+) results
+GROUP BY results.year, results.month, results.state;

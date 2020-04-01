@@ -1,0 +1,688 @@
+
+
+#Read data
+
+
+To create the big matrix, I pick up the years 2005 and 2008 and create a csv document of all these data.
+```{r}
+#library(biganalytics)
+#X <- read.big.matrix("AirlineData0508.csv", header = TRUE, 
+                     #backingfile = "air0508.bin",
+                     #descriptorfile = "air0508.desc",
+                     #type = "integer", extraCols = "age")
+#X05 <- read.big.matrix("2005.csv", header = TRUE, 
+                    # backingfile = "air05.bin",
+                    # descriptorfile = "air05.desc",
+                    # type = "integer", extraCols = "age")
+#X08<- read.big.matrix("2008.csv", header = TRUE, 
+                    # backingfile = "air08.bin",
+                    # descriptorfile = "air08.desc",
+                    # type = "integer", extraCols = "age")
+```
+
+
+read the data and the big matrix.
+```{r}
+library(data.table)
+library(biganalytics)
+library(foreach)
+#x0508<- attach.big.matrix("air0508.desc")
+#data08=fread("~/project/2008.csv")
+#save(data08, file = 'data08.RDdata')
+#data05=fread("~/project/2005.csv")
+#save(data05, file = 'data05.RDdata')
+load('data05.RDdata')
+load('data08.RDdata')
+#head(data05)
+```
+
+#Check the NA in the data.
+Na means we do not have the information about that flight. Since we are  interested in the reason or related variables about the specific type of delay. Even though there are many NAs in the data set of 2008, there still a large number of observations in our data. It is enough to do the further research.
+```{r}
+#check 2005
+na05=sum(is.na(data05[,'WeatherDelay'])|is.na(data05[,'SecurityDelay'])|is.na(data05[,'LateAircraftDelay'])|is.na(data05[,'NASDelay'])|is.na(data05[,'CarrierDelay']))
+na05
+nrow(data05)-na05
+
+
+#check 2008
+na08=sum(is.na(data08[,'WeatherDelay'])&is.na(data08[,'SecurityDelay'])&is.na(data08[,'LateAircraftDelay'])&is.na(data08[,'NASDelay'])&is.na(data08[,'CarrierDelay']))
+na08
+nrow(data08)-na08
+
+
+
+sum(is.na(data08[,'WeatherDelay']))
+sum(is.na(data08[,'SecurityDelay']))
+sum(is.na(data08[,'LateAircraftDelay']))
+sum(is.na(data08[,'NASDelay']))
+sum(is.na(data08[,'CarrierDelay']))
+```
+
+#calculate the proportion of the average delay for 2005 data.
+```{r}
+WeatherDelay05=sum(data05[which(data05[,'WeatherDelay']>0),'WeatherDelay'])/nrow(data05)
+SecurityDelay05=sum(data05[which(data05[,'SecurityDelay']>0),'SecurityDelay'])/nrow(data05)
+CarrierDelay05=sum(data05[which(data05[,'CarrierDelay']>0),'CarrierDelay'])/nrow(data05)
+NASDelay05=sum(data05[which(data05[,'NASDelay']>0),'NASDelay'])/nrow(data05)
+LateAircraftDelay05=sum(data05[which(data05[,'LateAircraftDelay']>0),'LateAircraftDelay'])/nrow(data05)
+delay05=cbind(LateAircraftDelay05,NASDelay05,CarrierDelay05,WeatherDelay05,SecurityDelay05)
+percent05=numeric(5)
+for(i in 1:5){
+  percent05[i]=delay05[i]/sum(delay05)
+}
+delayType=c('LateAircraftDelay','NASDelay','CarrierDelay','WeatherDelay','SecurityDelay')
+cbind(delayType,percent05)
+ delayType <- paste( delayType, round(percent05*100,2),'%')
+#colnames(data05)
+pie(percent05, labels = delayType, main="Pie Chart of Delay Type for 2005")
+```
+
+
+##calculate the proportion of the average delay for 2008 data.
+```{r}
+#So I only consider the non-NA part.
+#colnames(x08)
+#data08new=data08[complete.cases(data08[ , 25:29]),]
+data08new<- attach.big.matrix("air08.desc")
+
+WeatherDelay08=sum(data08new[which(data08new[,'WeatherDelay']>0),'WeatherDelay'])/nrow(data08new)
+SecurityDelay08=sum(data08new[which(data08new[,'SecurityDelay']>0),'SecurityDelay'])/nrow(data08new)
+CarrierDelay08=sum(data08new[which(data08new[,'CarrierDelay']>0),'CarrierDelay'])/nrow(data08new)
+NASDelay08=sum(data08new[which(data08new[,'NASDelay']>0),'NASDelay'])/nrow(data08new)
+LateAircraftDelay08=sum(data08new[which(data08new[,'LateAircraftDelay']>0),'LateAircraftDelay'])/nrow(data08new)
+delay08=cbind(LateAircraftDelay08,NASDelay08,CarrierDelay08,WeatherDelay08,SecurityDelay08)
+percent08=numeric(5)
+for(i in 1:5){
+  percent08[i]=delay08[i]/sum(delay08)
+}
+delayType=c('LateAircraftDelay','NASDelay','CarrierDelay','WeatherDelay','SecurityDelay')
+cbind(delayType,percent08)
+ delayType <- paste( delayType, round(percent08*100,2),'%')
+pie(percent08, labels = delayType, main="Pie Chart of Delay Type for 2008")
+```
+
+#2005
+```{r}
+arrdelayInd<-which(data05[,"ArrDelay"]>0)
+arrdelayed<-data05[arrdelayInd,c('LateAircraftDelay','NASDelay','CarrierDelay','WeatherDelay','SecurityDelay')]
+wadelayed<-which(arrdelayed[, "WeatherDelay"]>0)
+sadelayed<-which(arrdelayed[, "SecurityDelay"]>0)
+nadelayed<-which(arrdelayed[, "NASDelay"]>0)
+cadelayed<-which(arrdelayed[, "CarrierDelay"]>0)
+ladelayed<-which(arrdelayed[, "LateAircraftDelay"]>0)
+
+# Percentage of late arriving flights that had weather delays
+# About 3.6% of late arriving flights had weather delays
+length(wadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had security delays
+# About .21% of late arrivig flights had security delays
+length(sadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had NASDelay
+# About 29% of late arriving flights had NASDelay
+length(nadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had CarrierDelay
+# About 21.5% of late arrivig flights had CarrierDelay
+length(cadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had LateAircraftDelay
+# About 20.5% of late arrivig flights had LateAircraftDelay
+length(ladelayed)/nrow(arrdelayed)
+
+
+# Average weather delay for flights with arrival delays & average weather delay for late arriving flights that had weather delays
+# Average weather delay for flights delayed by weather is much higher because most late arriving flights are not delayed by weather.
+a=unlist(arrdelayed[,"WeatherDelay"])
+c(mean(a,na.rm=TRUE), mean(unlist(arrdelayed[wadelayed,"WeatherDelay"]),na.rm=TRUE))
+# Similarly for security delays
+c(mean(unlist(arrdelayed[,"SecurityDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[sadelayed,"SecurityDelay"]),na.rm=TRUE))
+#LateAircraftDelay
+c(mean(unlist(arrdelayed[,"LateAircraftDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[ladelayed,"LateAircraftDelay"]),na.rm=TRUE))
+#CarrierDelay
+c(mean(unlist(arrdelayed[,"CarrierDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[cadelayed,"CarrierDelay"]),na.rm=TRUE))
+c(mean(unlist(arrdelayed[,"NASDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[nadelayed,"NASDelay"]),na.rm=TRUE))
+
+
+# Average arrival delays for fligths delayed by weather and delayed by security
+c(mean(unlist(data05[which(data05[,"WeatherDelay"]>0),"ArrDelay"]),na.rm=TRUE),
+  mean(unlist(data05[which(data05[,"SecurityDelay"]>0),"ArrDelay"]),na.rm=TRUE),mean(unlist(data05[which(data05[,"CarrierDelay"]>0),"ArrDelay"]),na.rm=TRUE),mean(unlist(data05[which(data05[,"NASDelay"]>0),"ArrDelay"]),na.rm=TRUE),mean(unlist(data05[which(data05[,"LateAircraftDelay"]>0),"ArrDelay"]),na.rm=TRUE))
+
+# We could note from the examples above that weather delays tend to be longer than security delays on average for flights that 
+# arrive late and in general and weather delays happen more often than security delays.
+# We can also conclude that, on average, flights delayed by weather tend to have longer arrival delays than those delayed by security issues.
+
+# We could consider flights delayed by both types, but there are very few of these cases.
+bothdelays=which(data05[,"SecurityDelay"]>0 & data05[,"WeatherDelay"]>0&data05[,"LateAircraftDelay"]>0&data05[,"NASDelay"]>0&data05[,"SecurityDelay"]>0)
+mean(unlist(data05[bothdelays,"ArrDelay"]),na.rm=TRUE)
+length(bothdelays)
+```
+
+#2008
+```{r}
+arrdelayInd<-which(data08new[,"ArrDelay"]>0)
+arrdelayed<-data08new[arrdelayInd,c('LateAircraftDelay','NASDelay','CarrierDelay','WeatherDelay','SecurityDelay')]
+wadelayed<-which(arrdelayed[, "WeatherDelay"]>0)
+sadelayed<-which(arrdelayed[, "SecurityDelay"]>0)
+nadelayed<-which(arrdelayed[, "NASDelay"]>0)
+cadelayed<-which(arrdelayed[, "CarrierDelay"]>0)
+ladelayed<-which(arrdelayed[, "LateAircraftDelay"]>0)
+
+# Percentage of late arriving flights that had weather delays
+# About 3.6% of late arriving flights had weather delays
+length(wadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had security delays
+# About .21% of late arrivig flights had security delays
+length(sadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had NASDelay
+# About 29% of late arriving flights had NASDelay
+length(nadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had CarrierDelay
+# About 21.5% of late arrivig flights had CarrierDelay
+length(cadelayed)/nrow(arrdelayed)
+
+# Percentage of late arriving flights that had LateAircraftDelay
+# About 20.5% of late arrivig flights had LateAircraftDelay
+length(ladelayed)/nrow(arrdelayed)
+
+
+# Average weather delay for flights with arrival delays & average weather delay for late arriving flights that had weather delays
+# Average weather delay for flights delayed by weather is much higher because most late arriving flights are not delayed by weather.
+a=unlist(arrdelayed[,"WeatherDelay"])
+c(mean(a,na.rm=TRUE), mean(unlist(arrdelayed[wadelayed,"WeatherDelay"]),na.rm=TRUE))
+# Similarly for security delays
+c(mean(unlist(arrdelayed[,"SecurityDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[sadelayed,"SecurityDelay"]),na.rm=TRUE))
+#LateAircraftDelay
+c(mean(unlist(arrdelayed[,"LateAircraftDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[ladelayed,"LateAircraftDelay"]),na.rm=TRUE))
+#CarrierDelay
+c(mean(unlist(arrdelayed[,"CarrierDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[cadelayed,"CarrierDelay"]),na.rm=TRUE))
+c(mean(unlist(arrdelayed[,"NASDelay"]),na.rm=TRUE), mean(unlist(arrdelayed[nadelayed,"NASDelay"]),na.rm=TRUE))
+
+
+# Average arrival delays for fligths delayed by weather and delayed by security
+c(mean(unlist(data08new[which(data08new[,"WeatherDelay"]>0),"ArrDelay"]),na.rm=TRUE),
+  mean(unlist(data08new[which(data08new[,"SecurityDelay"]>0),"ArrDelay"]),na.rm=TRUE),mean(unlist(data08new[which(data08new[,"CarrierDelay"]>0),"ArrDelay"]),na.rm=TRUE),mean(unlist(data08new[which(data08new[,"NASDelay"]>0),"ArrDelay"]),na.rm=TRUE),mean(unlist(data08new[which(data08new[,"LateAircraftDelay"]>0),"ArrDelay"]),na.rm=TRUE))
+
+# We could note from the examples above that weather delays tend to be longer than security delays on average for flights that 
+# arrive late and in general and weather delays happen more often than security delays.
+# We can also conclude that, on average, flights delayed by weather tend to have longer arrival delays than those delayed by security issues.
+
+# We could consider flights delayed by both types, but there are very few of these cases.
+bothdelays=which(data08new[,"SecurityDelay"]>0 & data08new[,"WeatherDelay"]>0&data08new[,"LateAircraftDelay"]>0&data08new[,"NASDelay"]>0&data08new[,"SecurityDelay"]>0)
+mean(unlist(data08new[bothdelays,"ArrDelay"]),na.rm=TRUE)
+length(bothdelays)
+```
+```{r}
+library(biganalytics)
+x05<- attach.big.matrix("air05.desc")
+x08<- attach.big.matrix("air08.desc")
+blm3 <- biglm.big.matrix( ArrDelay ~ WeatherDelay+SecurityDelay+LateAircraftDelay+NASDelay+SecurityDelay, data = x05)
+summary(blm3)$rsq
+blm3 <- biglm.big.matrix( ArrDelay ~LateAircraftDelay+NASDelay+SecurityDelay, data = x05)
+summary(blm3)$rsq
+
+
+blm3 <- biglm.big.matrix( ArrDelay ~ WeatherDelay+SecurityDelay+LateAircraftDelay+NASDelay+SecurityDelay, data = x08)
+summary(blm3)$rsq
+
+blm3 <- biglm.big.matrix( ArrDelay ~LateAircraftDelay+NASDelay+SecurityDelay, data = x08)
+summary(blm3)$rsq
+```
+#So we focus on LateAircraftDelay.
+To explore the related variable behind the specific type of delay, we could ingore the flight with value 0 in that type of delay.
+```{r}
+library(biganalytics)
+x05<- attach.big.matrix("air05.desc")
+x08<- attach.big.matrix("air08.desc")
+blm3 <- biglm.big.matrix( ArrDelay ~ WeatherDelay+SecurityDelay+LateAircraftDelay+NASDelay+SecurityDelay, data = x05)
+summary(blm3)$rsq
+blm3 <- biglm.big.matrix( ArrDelay ~LateAircraftDelay+NASDelay+SecurityDelay, data = x05)
+summary(blm3)$rsq
+
+
+blm3 <- biglm.big.matrix( ArrDelay ~ WeatherDelay+SecurityDelay+LateAircraftDelay+NASDelay+SecurityDelay, data = x08)
+summary(blm3)$rsq
+
+blm3 <- biglm.big.matrix( ArrDelay ~LateAircraftDelay+NASDelay+SecurityDelay, data = x08)
+summary(blm3)$rsq
+```
+#So we focus on LateAircraftDelay.
+#rate
+```{r}
+library(biganalytics)
+library(foreach)
+x05<- attach.big.matrix("air05.desc")
+x05[which(x05[,'LateAircraftDelay']>0),'LateAircraftDelay']=1
+x05[which((x05[,'LateAircraftDelay']<=0)),'LateAircraftDelay']=0
+# Divide CRSDepTime by 100 and take the floor to 
+# get the departure hour.
+depHours <- floor(x05[,"CRSDepTime"]/100)
+# Set the departure hours listed as 24 to 0.
+depHours[depHours==24] <- 0
+# Split on the hours.
+hourInds <- split(1:length(depHours), depHours)
+# Create a variable to hold the quantile probabilities.
+#myProbs <- c(0.55)
+# Use foreach to find the quantiles for each hour.
+LateAircraftDelayQuantiles05 <- foreach( hour = hourInds, .combine=cbind) %do% {
+  require(bigmemory)
+  mean(x05[hour, "LateAircraftDelay"], na.rm = TRUE)
+}
+# Clean up the column names.
+colnames(LateAircraftDelayQuantiles05) <- names(hourInds)
+```
+
+```{r}
+x08<- attach.big.matrix("air08.desc")
+x08[which((x08[,'LateAircraftDelay']>0)),'LateAircraftDelay']=1
+x08[which((x08[,'LateAircraftDelay']<=0)),'LateAircraftDelay']=0
+nrow(x08)
+head(x08)
+#is.na(x08[1,'CancellationCode'])
+#x08=x08[which(is.na(x08[,'LateAircraftDelay'])),]
+#sum(is.na(x08[,'LateAircraftDelay']))
+
+# Divide CRSDepTime by 100 and take the floor to 
+# get the departure hour.
+depHours <- floor(x08[,"CRSDepTime"]/100)
+# Set the departure hours listed as 24 to 0.
+depHours[depHours==24] <- 0
+# Split on the hours.
+hourInds <- split(1:length(depHours), depHours)
+# Create a variable to hold the quantile probabilities.
+myProbs <- c(0.55)
+# Use foreach to find the quantiles for each hour.
+LateAircraftDelayQuantiles08 <- foreach( hour = hourInds, .combine=cbind) %do% {
+  require(bigmemory)
+ mean(x08[hour, "LateAircraftDelay"], na.rm = TRUE)
+}
+
+# Clean up the column names.
+colnames(LateAircraftDelayQuantiles08) <- names(hourInds)
+# See delay quantiles for the data.
+library(ggplot2)
+library(reshape2) # load library for melt; this is not in the text code
+dq08 <- melt(LateAircraftDelayQuantiles08)
+dq05=melt(LateAircraftDelayQuantiles05)
+
+names(dq05) <- c("percentile", "hour", "delay05")
+names(dq08) <- c("percentile", "hour", "delay08")
+
+# Line plot with multiple groups
+ggplot() +
+  geom_line(data=dq05, aes(x=hour, y=delay05),color="red",size=1.2)+geom_line(data=dq08, aes(x=hour, y=delay08), color="blue", size=1.2)+labs(title = " Late Aircraft Delay rate vs  Departure Hour")+ ylab("Late Aircraft Delay rate")+xlab('Hour')+
+  scale_color_discrete(name ="Year", labels = c("2005", "2008")) #??????
+```
+```{r}
+library(biganalytics)
+library(foreach)
+x05<- attach.big.matrix("air05.desc")
+x05=x05[which(x05[,'LateAircraftDelay']>0),]
+# Divide CRSDepTime by 100 and take the floor to 
+# get the departure hour.
+depHours <- floor(x05[,"CRSDepTime"]/100)
+# Set the departure hours listed as 24 to 0.
+depHours[depHours==24] <- 0
+# Split on the hours.
+hourInds <- split(1:length(depHours), depHours)
+# Create a variable to hold the quantile probabilities.
+myProbs <- c(0.55)
+# Use foreach to find the quantiles for each hour.
+LateAircraftDelayQuantiles05 <- foreach( hour = hourInds, .combine=cbind) %do% {
+  require(bigmemory)
+  quantile(x05[hour, "LateAircraftDelay"], myProbs, na.rm = TRUE)
+}
+# Clean up the column names.
+colnames(LateAircraftDelayQuantiles05) <- names(hourInds)
+```
+
+```{r}
+x08<- attach.big.matrix("air08.desc")
+x08=x08[which((x08[,'LateAircraftDelay']>0)),]
+nrow(x08)
+head(x08)
+#is.na(x08[1,'CancellationCode'])
+#x08=x08[which(is.na(x08[,'LateAircraftDelay'])),]
+#sum(is.na(x08[,'LateAircraftDelay']))
+
+# Divide CRSDepTime by 100 and take the floor to 
+# get the departure hour.
+depHours <- floor(x08[,"CRSDepTime"]/100)
+# Set the departure hours listed as 24 to 0.
+depHours[depHours==24] <- 0
+# Split on the hours.
+hourInds <- split(1:length(depHours), depHours)
+# Create a variable to hold the quantile probabilities.
+myProbs <- c(0.55)
+# Use foreach to find the quantiles for each hour.
+LateAircraftDelayQuantiles08 <- foreach( hour = hourInds, .combine=cbind) %do% {
+  require(bigmemory)
+  quantile(x08[hour, "DepDelay"], myProbs, na.rm = TRUE)
+}
+
+# Clean up the column names.
+colnames(LateAircraftDelayQuantiles08) <- names(hourInds)
+# See delay quantiles for the data.
+library(ggplot2)
+library(reshape2) # load library for melt; this is not in the text code
+dq08 <- melt(LateAircraftDelayQuantiles08)
+dq05=melt(LateAircraftDelayQuantiles05)
+
+names(dq05) <- c("percentile", "hour", "delay05")
+names(dq08) <- c("percentile", "hour", "delay08")
+
+# Line plot with multiple groups
+ggplot() +
+  geom_line(data=dq05, aes(x=hour, y=delay05),color="red",size=1.2)+geom_line(data=dq08, aes(x=hour, y=delay08), color="blue", size=1.2)+labs(title = " Late Aircraft Delay vs  Departure Hour")+ ylab("Late Aircraft Delay")+xlab('Hour')+
+  scale_color_discrete(name ="Year", labels = c("2005", "2008")) #??????
+```
+
+
+
+#Merge data.
+
+```{r}
+#for 2005
+airport <- read.csv("airports.csv")
+destination_airport <- read.csv("airports.csv")
+names(destination_airport) <- c("destination_iata","destination_airport", "destination_city","destination_state", "destination_country", "destination_lat", "destination_long")
+
+#merge origin airports
+data_all05<- merge(data05, airport, by.x = 'Origin', by.y = 'iata')
+#merge destination airports
+data_all05 <- merge (data_all05, destination_airport,  by.x = 'Dest', by.y = 'destination_iata')
+#merge plane
+plane <- read.csv("plane-data.csv")
+colnames(plane[c("year")]) <- "plane_year"
+data_all05 <- merge (data_all05, plane ,by.x = 'TailNum', by.y = 'tailnum', all.x = T)
+#merge carrier
+carrier=read.csv("carriers.csv")
+data_all05 <- merge (data_all05, carrier,by.x = 'UniqueCarrier', by.y = 'Code', all.x = T)
+head(data_all05)
+nrow(data_all05)
+ncol(data_all05)
+
+#2008
+#merge origin airports
+data_all08<- merge(data08, airport, by.x = 'Origin', by.y = 'iata')
+#merge destination airports
+data_all08 <- merge (data_all08, destination_airport,  by.x = 'Dest', by.y = 'destination_iata')
+#merge plane
+data_all08 <- merge (data_all08, plane ,by.x = 'TailNum', by.y = 'tailnum', all.x = T)
+#merge carrier
+data_all08 <- merge (data_all08, carrier,by.x = 'UniqueCarrier', by.y = 'Code', all.x = T)
+head(data_all08)
+nrow(data_all08)
+ncol(data_all08)
+```
+
+```{r}
+#save(data_all08, file = 'data_all08.RDdata')
+load('data_all08.RDdata')
+#save(data_all05, file = 'data_all05.RDdata')
+load('data_all05.RDdata')
+```
+
+
+#explore the related variables of NASDelay.
+
+```{r,echo=FALSE,message=FALSE, warning=FALSE, results='hide'}
+installIfNeeded = function(cliblist){
+  libsNeeded = cliblist
+  libsNeeded = libsNeeded[!(libsNeeded %in% installed.packages()[,"Package"])]
+  if(length(libsNeeded)>0) install.packages(libsNeeded)
+}
+
+installIfNeeded("treemap")
+
+# load the treemap package
+library('treemap')
+
+# Any package that is required by the script below is given here:
+inst_pkgs = load_pkgs =  c("ggplot2","ggplot2movies", "dplyr","babynames","data.table","Rcpp")
+inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
+if(length(inst_pkgs)) install.packages(inst_pkgs)
+
+git_pkgs = git_pkgs_load = c("streamgraph","DT")
+
+git_pkgs = git_pkgs[!(git_pkgs %in% installed.packages()[,"Package"])]
+
+if(length(git_pkgs)){
+  library(devtools)
+  install_github('rstudio/DT')
+  install_github('hrbrmstr/streamgraph')
+}
+
+load_pkgs = c(load_pkgs, git_pkgs_load)
+
+# Dynamically load packages
+pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+
+```
+
+
+
+```{r}
+#2005
+
+data_NA05=data_all05[which(data_all05[,'NASDelay']>0),]
+#which(data_all05[,'NASDelay']<0)????
+nrow(data_NA05)
+ncol(data_NA05)
+```
+
+
+```{r}
+#average delay time for each origin airport(departure)
+airport_NA05_mean <- aggregate(NASDelay ~Origin,data_NA05, mean)
+airport_NA05_mean<- airport_NA05_mean[order(airport_NA05_mean$NASDelay),]
+airport_NA05_mean
+summary(airport_NA05_mean)
+treemap(airport_NA05_mean,
+        index=c("Origin"),
+        vSize="NASDelay",
+        vColor="NASDelay",
+        type="value",title = 'Average NASDelay for Each Origin Airport in 2005')
+```
+
+```{r}
+#2008
+data_NA08=data_all08[which(data_all08[,'NASDelay']>0),]
+data_NA08=data_NA08[which(!is.na(data_NA08[,'NASDelay'])),]
+nrow(data_NA08)
+ncol(data_NA08)
+```
+
+```{r}
+#average delay time for each origin airport(departure)
+Airport_NA08_mean <- aggregate(NASDelay ~Origin,data_NA08, mean)
+Airport_NA08_mean<- Airport_NA08_mean[order(Airport_NA08_mean$NASDelay),]
+Airport_NA08_mean
+summary(Airport_NA08_mean)
+
+treemap(Airport_NA08_mean,
+        index=c("Origin"),
+        vSize="NASDelay",
+        vColor="NASDelay",
+        type="value",title = 'Average NASDelay for Each Origin Airport in 2008')
+```
+#Explore the NA data
+```{r}
+#2008
+data_NA08NEW=data_all08[which(is.na(data_all08[,'NASDelay'])),]
+head(data_NA08NEW)
+data_NA08NEW[,'NASDelay']=1
+```
+
+```{r}
+Airport_NA08_sum<- aggregate(NASDelay ~Origin,data_NA08NEW, sum)
+Airport_NA08_sum<- Airport_NA08_sum[order(Airport_NA08_sum$NASDelay),]
+Airport_NA08_sum
+summary(Airport_NA08_sum)
+
+treemap(Airport_NA08_sum,
+        index=c("Origin"),
+        vSize="NASDelay",
+        vColor="NASDelay",
+        type="value",title = 'Count of NA in NASDelay for Each Origin Airport in 2008')
+```
+
+#Explore the related variable of CarrierDelay
+```{r}
+#2005
+data_Carrier05=data_all05[which(data_all05[,'CarrierDelay']>0),]
+#which(data_all05[,'NASDelay']<0)????
+nrow(data_Carrier05)
+ncol(data_Carrier05)
+
+
+#average delay time for each Carrier 
+Carrier05_mean <- aggregate(CarrierDelay ~Description,data_Carrier05, mean)
+Carrier05_mean<- Carrier05_mean[order(Carrier05_mean$CarrierDelay),]
+Carrier05_mean
+summary(Carrier05_mean)
+treemap(Carrier05_mean,
+        index=c("Description"),
+        vSize="CarrierDelay",
+        vColor="CarrierDelay",
+        type="value",title = 'Average CarrierDelay for Each Carrier in 2005')
+```
+
+```{r}
+#2008
+data_Carrier08=data_all08[which(!is.na(data_all08[,'CarrierDelay'])),]
+data_Carrier08=data_all08[which(data_Carrier08[,'CarrierDelay']>0),]
+#which(data_all05[,'NASDelay']<0)????
+nrow(data_Carrier08)
+ncol(data_Carrier08)
+#names(data_Carrier08)
+#head(data_Carrier08)
+#average delay time for each Carrier 
+Carrier08_mean <- aggregate(CarrierDelay ~Description,data_Carrier08, mean)
+Carrier08_mean<- Carrier08_mean[order(Carrier08_mean$CarrierDelay),]
+Carrier08_mean
+summary(Carrier08_mean)
+treemap(Carrier08_mean,
+        index=c("Description"),
+        vSize="CarrierDelay",
+        vColor="CarrierDelay",
+        type="value",title = 'Average CarrierDelay for Each Carrier in 2008')
+```
+#Deal with NA
+```{r}
+#2008
+data_Carrier08NEW=data_all08[which(is.na(data_all08[,'CarrierDelay'])),]
+data_Carrier08NEW[,'CarrierDelay']=1
+
+Carrier08_sum<- aggregate(CarrierDelay ~Description,data_Carrier08NEW, sum)
+treemap(Carrier08_sum,
+ index=c("Description"),
+        vSize="CarrierDelay",
+        vColor="CarrierDelay",
+        type="value",title = 'Count of NA in CarrierDelay for Each Carrier in 2008')
+
+names(data08)
+sum(is.na(data08[,'ArrDelay']))
+sum(is.na(data08[,'DepDelay']))
+```
+
+
+
+#find the rountes has the most delays
+
+```{r}
+inst_pkgs = load_pkgs =  c("streamR","ROAuth","maps","map_data",
+                           "ggplot2", "grid","scales")
+inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
+if(length(inst_pkgs)) install.packages(inst_pkgs)
+
+# Dynamically load packages
+pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+# Dynamically load packages
+pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+```
+
+```{r}
+library( dplyr)
+plot.tweets = function(map, pointsa, pointsd){
+  x=rbind(pointsa[1,1],pointsd[1,1])
+y=rbind(pointsa[1,2],pointsd[1,2])
+s=cbind(x,y)
+  # Initialize ggplot object with map data
+  mapd=ggplot(map) +
+    # Add the map data
+    geom_map(aes(map_id = region), map = map, fill = "white", color = "grey20", size = 0.25) + 
+    # Set map limits
+    expand_limits(x = map$long, y = map$lat) + 
+    # Add a theme  
+    theme(axis.line = element_blank(), axis.text = element_blank(), axis.ticks = element_blank(), 
+          axis.title = element_blank(), panel.background = element_blank(), panel.border = element_blank(), 
+          panel.grid.major = element_blank(), plot.background = element_blank(), 
+          plot.margin = unit(0 * c(-1.5, -1.5, -1.5, -1.5), "lines")) + 
+    
+    # Add points
+    geom_point(data = pointsa, aes(x = x, y = y), size = 3, alpha = 1/5, color ='blue')+ 
+    geom_point(data = pointsd, aes(x = x, y = y), size = 3, alpha = 1/5, color ='red')+
+    geom_line(data=s,aes(x=x,y=y),color='red')
+  
+  
+  # Graph ggplot2 object
+  print(mapd)
+}
+
+```
+
+
+
+```{r}
+data05case=data_all05[which(data_all05[,'ArrDelay']>0),]
+data08case=data_all08[which(data_all08[,'ArrDelay']>0&!is.na(data_all08[,'ArrDelay'])),]
+names(data05case)
+```
+
+```{r}
+#2005
+mean05 <- aggregate(ArrDelay~Origin+long+lat+Dest+destination_airport+destination_long+destination_lat+destination_state+destination_state+destination_country,data05case, mean)
+mean05_sort <- mean05[order(-mean05$ArrDelay),]
+mean05_sort_10=mean05_sort[1:10,]
+#2008
+mean08 <- aggregate(ArrDelay~Origin+long++lat+Dest+destination_airport+destination_long+destination_lat+destination_state+destination_state+destination_country,data08case, mean)
+mean08_sort <- mean08[order(-mean08$ArrDelay),]
+mean08_sort_10=mean08_sort[1:10,]
+```
+
+```{r}
+#2005
+apoints = data.frame(x = as.numeric(mean05_sort_10$destination_long), y = as.numeric(mean05_sort_10$destination_lat))
+dpoints = data.frame(x = as.numeric(mean05_sort_10$long), y = as.numeric(mean05_sort_10$lat))
+#write.csv(apoints,'a05.csv')
+#write.csv(dpoints,'d05.csv')
+```
+
+
+```{r}
+usa.map.data = map_data("usa")
+# Calling the function to plot the data
+plot.tweets(usa.map.data, apoints,dpoints)
+```
+
+```{r}
+#2008
+apoints = data.frame(x = as.numeric(mean08_sort_10$destination_long), y = as.numeric(mean08_sort_10$destination_lat))
+dpoints = data.frame(x = as.numeric(mean08_sort_10$long), y = as.numeric(mean08_sort_10$lat))
+#write.csv(apoints,'a08.csv')
+#write.csv(dpoints,'d08.csv')
+```
+
+
+```{r}
+usa.map.data = map_data("usa")
+# Calling the function to plot the data
+plot.tweets(usa.map.data, apoints,dpoints)
+```
+

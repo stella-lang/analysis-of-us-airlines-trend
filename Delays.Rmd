@@ -1,0 +1,248 @@
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+
+```{r}
+
+library(dplyr)
+library(circlize)
+library(treemap)
+library(gplots)
+library(ggplot2)
+library(streamgraph)
+
+```
+
+Data Processing
+
+
+
+
+
+```{r}
+
+#Huge data created from multiple joins, hence not provided here
+#load("~/Stat480/Project/backup1.RData")
+
+```
+
+Starting with some basic visualizations (bar charts and line graphs)
+
+```{r}
+
+
+by_year = airlines_ext3 %>% group_by(Year, Month) %>%
+  summarise(traffic = n(),
+            pct_arrdel = sum(ArrDelay > 0, na.rm = T)/traffic,
+            pct_depdel = sum(DepDelay > 0, na.rm = T)/traffic) %>% arrange(desc(pct_depdel))
+
+
+by_day = airlines_ext3 %>% group_by(Year, DayOfWeek) %>%
+  summarise(traffic = n(),
+            pct_arrdel = sum(ArrDelay > 0, na.rm = T)/traffic,
+            pct_depdel = sum(DepDelay > 0, na.rm = T)/traffic) %>% arrange(desc(pct_depdel))
+
+
+ggplot(data=by_year,
+       aes(x=Month, y=pct_depdel, group=as.factor(Year))) +
+       geom_line(aes(colour = as.factor(Year))) +  theme_gray() +
+  labs(x = "Month", y = "Delay Percentage", title = "Delay % by Month", colour = "Year") + scale_x_discrete(limits = month.abb)
+
+
+ggplot(data=by_day,
+       aes(x=DayOfWeek, y=pct_arrdel, group=as.factor(Year))) +
+       geom_line(aes(colour = as.factor(Year))) +  theme_gray() +
+  labs(x = "DayOfWeek", y = "Delay Percentage", title = "Delay % by DayOfWeek", colour = "Year")
+
+```
+
+The holiday months of December and January show the high percentages of delayed flights, as we would expect, as do the summer holiday months of June and July. Both arrival and departure delays follow largely similar trends if we look at the larger picture. One unique pattern though, is between the first and second halves of the year. 2005 has better delay rates for the first half of the year, while the second half of 2008 shows a marked improvement over 2005. This could be because the *latter half of 2005 was a season for record breaking Atlantic hurricanes, including three of the top ten most strong hurricanes to have ever been recorded (Hurricane Katrina, Wilma and Rita)*
+
+```{r}
+airlines_ext3$DepHour = with(airlines_ext3, ifelse(nchar(DepTime) > 3, substr(DepTime, 1,2), substr(DepTime, 1,1)))
+
+by_hour = airlines_ext3 %>% group_by(DepHour) %>%
+  summarise(traffic = n(),
+            pct_arrdel = sum(ArrDelay > 15, na.rm = T)/traffic,
+            pct_depdel = sum(DepDelay > 15, na.rm = T)/traffic) %>% arrange(desc(pct_depdel)) %>%
+  na.omit()
+
+
+```
+
+Looking at the same by hour shows that the midnight times of from 11PM to 1AM are the worst times to fly out of airports in USA, as they have the highest percentage of delayed flights. On the other hand, early morning flights (from 5-7AM) are great times to fly as they have the least percentage of delayed flights.
+
+
+More Specific drilled down analysis:
+
+Starting with carriers analysis
+```{r}
+
+by_carrier = airlines_ext3 %>% group_by(UniqueCarrier) %>%
+  summarise(traffic = n(),
+            avg_distance = mean(Distance),
+            dest_airports = length(unique(dest_airport)),
+            pct_arrdel = sum(ArrDelay > 15, na.rm = T)/traffic,
+            pct_depdel = sum(DepDelay > 15, na.rm = T)/traffic) %>% arrange(desc(pct_depdel)) %>%
+  na.omit()
+
+
+treemap(by_carrier,
+        index=c("UniqueCarrier"), 
+        vSize="traffic",
+        vColor="pct_arrdel", 
+        type="value", title.legend = "% Delayed", title = "Total Flights")
+```
+
+
+Building a treemap with total flights and % delays, gives us a good starting point
+to start analyzing delays. The treemap gives us relatively straightforward conclusions,
+in that a carrier is more likely to have delays if they run more flights. All the carriers that have a low % of delayed departures (), also do not run a lot of flights. Despite that, Southwest Airlines (WN) and Skywest Airlines can be noted for haveing lesser delays than other carriers who run more flights (American Airlines and Delta Airlines).  Some fringe airlines (Pinacle Airlines and Hawaiian Air) manage their low flight load efficiently with low % of delays. 
+
+
+If we go for a slightly more unorthodox metric, and splitting the analysis by year, we get:
+
+```{r}
+by_carrier1 = airlines_ext3 %>% group_by(UniqueCarrier, Year) %>%
+  summarise(traffic = n(),
+            avg_distance = mean(Distance),
+            dest_airports = length(unique(dest_airport)),
+            pct_arrdel = sum(ArrDelay > 15, na.rm = T)/traffic,
+            pct_depdel = sum(DepDelay > 15, na.rm = T)/traffic) %>% arrange(desc(pct_depdel)) %>%
+  na.omit()
+
+
+treemap(by_carrier1,
+        index=c("Year","UniqueCarrier"), 
+        vSize="dest_airports",
+        vColor="pct_depdel", 
+        type="value", title.legend = "% Departures Delayed", title = "# Destinations Flown To")
+
+
+```
+
+
+If we use the number of destinations an airlines flies to mark size in a tree map,  we get a really interesting tree map. Skywest Airlines again stands out for covering a number of destinations and having a comparably low % of arrival delays. Comparing against the last  treemap, we can conclude that Southwest runs a lot of flights to very few destinations. 
+
+Pinnacle Airlines (9E) which last stood out for having very low traffic and % of flights having a late departure, also stands out here for covering a lot of destinations with their low traffic and their low % of delayed departures. 
+
+Comparing across the years (2005 to 2009), we can see that Pinnacle Airlines entered the market only afer 2005 as a major airline (it closed down in 2012).
+
+
+Next we use average distance:
+
+```{r}
+
+treemap(by_carrier1,
+        index=c("Year","UniqueCarrier"), 
+        vSize="avg_distance",
+        vColor="pct_arrdel", 
+        type="value", title.legend = "% Arr Delayed", title = "Avg Distance Flown")
+
+```
+
+
+If we use Avg Distance flown against % of flights that arrive late, to check against the hypothesis that flights which travel longer will also be delayed more often, we see that it is largely true. ATA Airlines (TZ) and America West Airlines (HP) stand out for flying comparably longer distances and having low % of flights land late. 
+
+The two flights from Hawaii, Hawaiian Airlines (HA) and Aloha Airlines (AQ) stand out for flying smaller distances at exceptionally low delayed landings. This is probably the advantage of always flying to the same airport. 
+
+Comparing across the years, we can see that Aloha Airlines (AQ), entered the market only in 2008. Also, we can note that while JetBlue (B6) may have improved on their tendency to arrive late in 2008, they have done this at the cost of flying marginally smaller distances. ATA Airlines (TZ), who figure majorly in the 2005 map, are missing from the 2008 map. *This can be attributed to them ceasing operations in April 2008, and hence not flying as much as the other operators.*
+
+
+Another interesting way to explore delays in to figure out top 20 airports in terms of traffic, and see their arrival and delay times as a heatmap. Since there are 314 airports, using the top twenty in terms of traffic will provide an interesting edge to our analysis, since these 20 account for 51% of total traffic in our data.
+
+
+```{r, fig.width=10, fig.height=10}
+src_busy = airlines_ext3 %>% group_by(src_airport, src_city) %>%
+  summarise(traffic = n(),
+            mean_depdel = mean(DepDelay, na.rm = T),
+            del_counts = sum(DepDelay > 0, na.rm = T),
+            mean_dist = mean(Distance, na.rm = T),
+            pct_del = sum(DepDelay > 0, na.rm = T)/traffic) %>% arrange(desc(traffic)) %>% 
+  head(n = 20)
+
+src_busy1 = as.matrix(src_busy[,3:7])
+base::dimnames(src_busy1)[1] = src_busy[,2]
+
+
+heatmap.2(src_busy1, scale = "column", trace = "none", density.info = "none", dendrogram="row", cexCol = 0.8, main = "Delay Heatmap for Top 20 Source Airports", xlab = "Metrics")
+
+
+```
+
+
+Covington's airport stands out, as they have noticably less % of their flights delayed. 
+Flights from Covington also do not fly very far, which probably helps the turnaround time in their airport. 
+
+There doesn't seem to be a relationship between traffic (number of flights that pass through the airport) and % of flights delayed (Atlanta vs Newark or Charlotte)
+
+
+```{r}
+
+chord_data = airlines_ext3 %>% group_by(src_city, dest_city) %>%
+  summarise(del = sum(ArrDelay > 15)) %>% arrange(desc(del)) %>% 
+  head(n = 10)
+
+chordDiagram(chord_data, directional = TRUE)
+title(main = "Chord Diagram - Arrival Delays")
+
+
+
+
+```
+Looking at the top 10 routes that often have departure delays (these 10 account for 31% of delays), we can make note of a couple of notorious routes. Honolulu to California (San Jose and Sacremento) flights are delayed quite often, while flying out of San Antonio is also notable for delaying the arrival. Minneapolis to Fairbanks and Austin to Nashville are seen as the trips that land late quite often. Nashville also shares this reputation with flights that fly there from San Antonio. 
+
+```{r}
+chord_data = airlines_ext3 %>% group_by(src_city, dest_city) %>%
+  summarise(del = sum(DepDelay > 15)) %>% arrange(desc(del)) %>% 
+  head(n = 10)
+
+chordDiagram(chord_data, directional = TRUE)
+title(main = "Chord Diagram - Departure Delays")
+
+rm(airlines_ext3)
+
+```
+
+Looking at the same chart for departure delays, we can see that the flight route from Nashville to Austin has a lot of delayed flights both ways. Austin again figures on the list when we look at flights from Austin to San Diego. Minneapolis to Sacremento departs late the most often.
+
+```{r}
+by_carrier2 = airlines_ext3 %>% group_by(src_city, Year) %>%
+  summarise(traffic = n(),
+            pct_arrdel = sum(ArrDelay > 15, na.rm = T)/traffic,
+            pct_depdel = sum(DepDelay > 15, na.rm = T)/traffic) %>% arrange(desc(pct_depdel)) %>%
+  na.omit() %>% filter(pct_arrdel != 1)
+
+
+treemap(by_carrier2,
+        index=c("src_city"), 
+        vSize="traffic",
+        vColor="pct_depdel", 
+        type="value", title.legend = "% Departures Delayed", title = "Total Traffic")
+
+```
+
+```{r}
+movie_lengths = newmoviedata %>%
+  select(year, length) %>%
+  group_by(year, length) %>%
+  tally()
+
+stream_data = airlines_ext3 %>% group_by(src_state, Month, Year) %>%
+  summarise(traffic = n(),
+            arrdel = sum(ArrDelay > 15, na.rm = T),
+            depdel = sum(DepDelay > 15, na.rm = T)) %>% arrange(desc(depdel)) %>%
+  na.omit()
+
+stream_data$time = with(stream_data, paste(Year, Month, "01", sep = "-"))
+
+streamgraph(stream_data[stream_data$Year == 2008,], "src_state", "depdel", "time", interactive=TRUE) %>%
+  sg_axis_x(20, "time", "%B") %>%
+  sg_fill_brewer("PuOr")
+
+
+```
+

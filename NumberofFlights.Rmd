@@ -1,0 +1,166 @@
+
+```{r, echo=FALSE}
+knitr::opts_knit$set(root.dir = "~/Stat480/project")
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+# Flight counts trends by month
+```{r}
+countsByMonth = read.delim("flightCountsByYearMonth/000000_0", header=FALSE, sep = "\t",
+                           col.names = c("year", "month", "count"))
+
+year1 = countsByMonth[countsByMonth$year == 2005, ]
+year2 = countsByMonth[countsByMonth$year == 2008, ]
+
+plot(year1$month, year1$count, type = "l", col="orange",
+     ylim = c(min(year1$count, year2$count), max(year1$count, year2$count)),
+     xlab = "Month", ylab = "Flights")
+lines(year2$month, year2$count, col="blue")
+legend("topright", legend = c("2005", "2008"), col = c("orange", "blue"), lty = 1)
+```
+
+Both 2005 and 2008 experienced devastating hurricane seasons from September to November, which might explain the sudden drops in flight numbers. The stock market also crashed in September of 2008 during the economic recession, and that might explain why flight counts were even lower during the following months compared to 2005.
+
+# Flight counts trends by day of the week
+```{r}
+countsByMonth = read.delim("flightCountsByYearDayOfWeek/000000_0", header=FALSE, sep = "\t",
+                           col.names = c("year", "dayOfWeek", "count"))
+
+year1 = countsByMonth[countsByMonth$year == 2005, ]
+year2 = countsByMonth[countsByMonth$year == 2008, ]
+
+plot(year1$dayOfWeek, year1$count, type = "l", col="orange",
+     ylim = c(min(year1$count, year2$count), max(year1$count, year2$count)),
+     ylab = "Flights", xlab = "Day of the Week")
+lines(year2$dayOfWeek, year2$count, col="blue")
+legend("topright", legend = c("2005", "2008"), col = c("orange", "blue"), lty = 1)
+```
+
+For both years, Saturday (day 6) has the lowest flight counts, followed by Sunday (day 7). This is potentially because Saturday is least likely to serve as the beginning/end of any flight plans, at least when it comes to vacations. 
+
+# Heat map of airline carriers
+```{r}
+carrierCounts.df = read.delim("carrierCountsByYear/000000_0", header=FALSE, sep = "\t",
+                             col.names = c("year","code","totalFlights","airportsServed","description"))
+
+library(gplots)
+matx = as.matrix(carrierCounts.df[carrierCounts.df$year == 2005, c("totalFlights","airportsServed")])
+row.names(matx) = carrierCounts.df[carrierCounts.df$year == 2005, "description"]
+matx = matx[order(rownames(matx)), ]
+heatmap.2(matx,
+          scale = "column",
+          dendrogram = "none",
+          key = FALSE,
+          cexCol = 1,
+          margins = c(5,12),
+          Rowv = FALSE,
+          lhei = c(0.25, 4, 0.25 ),
+          lmat = rbind( c(0, 3), c(2,1), c(0,4) ))
+
+matx = as.matrix(carrierCounts.df[carrierCounts.df$year == 2008, c("totalFlights","airportsServed")])
+row.names(matx) = carrierCounts.df[carrierCounts.df$year == 2008, "description"]
+matx = matx[order(rownames(matx)), ]
+heatmap.2(matx,
+          scale = "column",
+          dendrogram = "none",
+          key = FALSE,
+          cexCol = 1,
+          margins = c(5,12),
+          Rowv = FALSE,
+          lhei = c(0.25, 4, 0.25 ),
+          lmat = rbind( c(0, 3), c(2,1), c(0,4) ))
+```
+
+Here we see heatmaps of carrier companies comparing their number of flights and the number of airports they serve (calculated based off of origin airports of flights). In both years, Southwest Airlines Co. has the largest number of flights (way above average), but interestingly enough serves fewer than average airports compared to a company like Skywest Airlines Inc. We can also see that in 2008 many companies had increased their overall number of flights. Companies like AirTran Airways Corporation and JetBlue Airways have increased and gotten closer to the global average.
+
+In terms of changes in airports served, overall variation seems to have decreased as it did with the flight counts. Skywest Airlines Inc. remains as one of the carriers serving the most airports, while Hawaiian Airlines Inc. and the new and possibly similar Aloha Airlines Inc. serve the fewest.
+
+# Heatmap of manufacturers
+```{r}
+manu = data.frame()
+for (i in 0:5) {
+  x = read.delim(sprintf("manufacturersUsedByCarriers/00000%d_0", i), header=FALSE, sep = "\t",
+                             col.names = c("year","manu","avgFlightTime","carriers"))
+  manu = rbind(manu, x)
+}
+
+library(gplots)
+matx = as.matrix(manu[manu$year == 2005, c("avgFlightTime","carriers")])
+row.names(matx) = manu[manu$year == 2005, "manu"]
+matx = matx[order(rownames(matx)), ]
+heatmap.2(matx,
+          scale = "column",
+          dendrogram = "none",
+          key = FALSE,
+          cexCol = 1,
+          margins = c(5,12),
+          Rowv = FALSE,
+          lhei = c(0.25, 4, 0.25 ),
+          lmat = rbind( c(0, 3), c(2,1), c(0,4) ))
+
+matx = as.matrix(manu[manu$year == 2008, c("avgFlightTime","carriers")])
+row.names(matx) = manu[manu$year == 2008, "manu"]
+matx = matx[order(rownames(matx)), ]
+heatmap.2(matx,
+          scale = "column",
+          dendrogram = "none",
+          key = FALSE,
+          cexCol = 1,
+          margins = c(5,12),
+          Rowv = FALSE,
+          lhei = c(0.25, 4, 0.25 ),
+          lmat = rbind( c(0, 3), c(2,1), c(0,4) ))
+```
+
+
+
+# Stream graph of number of flights arriving at each state
+```{r}
+yearMonthState = data.frame()
+for (i in 0:5) {
+  x = read.delim(sprintf("yearMonthAirportStates/00000%d_0", i), header=FALSE, sep = "\t",
+                             col.names = c("year","month","state","count"))
+  yearMonthState = rbind(yearMonthState, x)
+}
+
+library(dplyr)
+library(streamgraph)
+yearMonthState %>%
+  dplyr::select(year, month, state, count) %>%
+  group_by(year, month, state) %>%
+  ungroup %>%
+  mutate(month = as.Date(sprintf("%d-%d-01", year, month))) -> x
+
+data2005 = x[x$year == 2005, ]
+streamgraph(data2005, 'state', 'count', 'month', interactive=TRUE) %>% sg_title("2005")
+
+data2008 = x[x$year == 2008, ]
+streamgraph(data2008, 'state', 'count', 'month', interactive=TRUE) %>% sg_title("2008")
+```
+
+In both years, the number of flights arriving at each state for each month remains roughly the same throughout the year. The stream graphs agree with the line plot of monthly trends shown earlier. It appears as though the overall monthly trend applies to every state, with the states with more flights arriving experiencing larger decreases than do states with few arriving flights.
+
+In the 2005 stream graph, the Louisiana (LA) stream (below the MA stream near the 300,000 y-axis level) shows a steep decrease in arrival flights (down to 3400 from 6900) beginning at September, and this makes sense because Hurricane Katrina devastated the state in late August.
+
+```{r}
+yearMonthCarrier = data.frame()
+for (i in 0:5) {
+  x = read.delim(sprintf("yearMonthCarriers/00000%d_0", i), header=FALSE, sep = "\t",
+                             col.names = c("year","month","desc","count"))
+  yearMonthCarrier = rbind(yearMonthCarrier, x)
+}
+
+library(dplyr)
+library(streamgraph)
+yearMonthCarrier %>%
+  dplyr::select(year, month, desc, count) %>%
+  group_by(year, month, desc) %>%
+  ungroup %>%
+  mutate(month = as.Date(sprintf("%d-%d-01", year, month))) -> x
+
+data2005 = x[x$year == 2005, ]
+streamgraph(data2005, 'desc', 'count', 'month', interactive=TRUE) %>% sg_title("2005")
+
+data2008 = x[x$year == 2008, ]
+streamgraph(data2008, 'desc', 'count', 'month', interactive=TRUE) %>% sg_title("2008")
+```

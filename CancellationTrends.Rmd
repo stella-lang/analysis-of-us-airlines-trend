@@ -1,0 +1,162 @@
+
+```{r}
+library(biganalytics)
+library(foreach)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(data.table)
+library(streamgraph)
+library(circlize)
+library(treemap)
+```
+
+```{r}
+# Set working directory to the directory containing the airlines data.
+setwd("~/Stat480/project")
+```
+
+
+```{r}
+# x = read.big.matrix("airlines0508.csv", header = TRUE,
+#                      backingfile = "air0508.bin",
+#                      descriptorfile = "air0508.desc",
+#                      type = "integer", extraCols = "age")
+x = attach.big.matrix("air0508.desc")
+```
+
+## Cancellations by Year/Month/Day of Week
+
+```{r}
+# annual cancellation rate
+yearCancel = foreach(i = c(2005, 2008), .combine=c) %do% {
+  100*sum(x[x[,"Year"] == i, "Cancelled"])/sum(x[,"Year"] == i)
+}
+
+# monthly cancellation rate
+monthlyCancel = foreach(i = c(2005, 2008), .combine=c) %do% {
+  year = x[x[,"Year"] == i, ]
+  foreach(j = 1:12, .combine = c) %do% {
+    100*sum(year[year[,"Month"] == j, "Cancelled"])/sum(year[,"Month"] == j)
+  }
+}
+
+# Cancellation rate by day of the week
+dayCancel = foreach(i = c(2005, 2008), .combine=c) %do% {
+  year = x[x[,"Year"] == i, ]
+  foreach(j = 1:7, .combine = c) %do% {
+    100*sum(year[year[,"DayOfWeek"] == j, "Cancelled"])/sum(year[,"DayOfWeek"] == j)
+  }
+}
+
+mylist = matrix(monthlyCancel, nrow = 12, ncol = 2)
+result = as.data.frame(mylist)
+colnames(result) = c("2005", "2008")
+result$month = 1:12
+# knitr::kable(result, full_width = FALSE, booktabs = TRUE)
+df = melt(result,  id.vars = 'month', variable.name = 'year')
+
+# plot on same grid, each series colored differently 
+ggplot(df, aes(month,value)) + geom_line(aes(colour = year)) + geom_point(aes(colour = year), alpha = 0.5) + ylab("Monthly Cancellation Rates") + xlab("Month") + scale_x_continuous(breaks = seq(1, 12)) + ggtitle("Cancellations by Month") + theme(plot.title = element_text(hjust=0.5))
+
+df2 = data.frame(day = rep(1:7,2), year = as.factor(rep(c(2005, 2008),each = 7)), value = dayCancel)
+ggplot(df2, aes(day,value)) + geom_line(aes(colour = year)) + geom_point(aes(colour = year), alpha = 0.5) + ylab("Cancellation Rates by Day of Week") + xlab("Day of Week") + scale_x_continuous(breaks = seq(1, 7)) + ggtitle("Cancellations by Day of Week")+ theme(plot.title = element_text(hjust=0.5))
+```
+
+
+```{r}
+airline = fread('airlines0508.csv')
+airline = as.data.frame(airline)
+```
+
+## Cancellations by State
+
+```{r}
+cancelled = airline[airline[,"Cancelled"]==1, ]
+airports = read.csv("airports.csv")
+combined = merge(cancelled,airports,by.x = "Origin",by.y = "iata")
+
+combined %>%
+  group_by(Year, Month, state) %>% 
+  tally() -> origin
+
+origin$Month = paste(origin$Year,origin$Month,"01",sep="-" )
+
+streamgraph(origin[origin$Year==2005,], "state", "n", "Month") %>%
+  sg_fill_brewer("PuOr")
+streamgraph(origin[origin$Year==2008,], "state", "n", "Month") %>%
+  sg_fill_brewer("PuOr")
+```
+
+```{r}
+sep2005 = combined[combined$Year == 2005 & combined$Month == 9,]
+
+sep2005 %>%
+  group_by(state, DayofMonth) %>% 
+  tally() %>%
+  ungroup -> sep2005
+
+sep2005$DayofMonth = paste("2005","9",sep2005$DayofMonth,sep="-" )
+
+streamgraph(sep2005, "state", "n", "DayofMonth") %>%
+  sg_fill_brewer("PuOr") %>%
+  sg_axis_x(tick_units = "day", tick_interval = 1, tick_format = "%d")
+```
+
+## Cancellations by Carrier
+
+```{r}
+cancelled %>%
+  group_by(Year, Month, UniqueCarrier) %>% 
+  tally() %>%
+  ungroup -> carrier
+
+carrier$Month = paste(carrier$Year,carrier$Month,"01",sep="-" )
+
+streamgraph(carrier[carrier$Year==2005,], "UniqueCarrier", "n", "Month") %>%
+  sg_fill_brewer("PuOr")
+streamgraph(carrier[carrier$Year==2008,], "UniqueCarrier", "n", "Month") %>%
+  sg_fill_brewer("PuOr")
+```
+
+
+```{r}
+combined %>%
+  group_by(Year, Month, UniqueCarrier, state) %>% 
+  tally() -> dat
+treemap(dat[dat$UniqueCarrier=="XE" & dat$Month == 9 & dat$Year == 2005,],
+        index=c("state"),
+        vSize="n",
+        vColor = "n",
+        type="value",title = "Cancellations of ExpressJet Airlines in September 2005", 
+        title.legend = "Number of Cancellations")
+```
+
+
+## Cancellations by Airports
+
+```{r}
+cancelled %>%
+  group_by(Year, Month, Origin) %>% 
+  tally() %>%
+  ungroup -> airport
+
+treemap(airport[airport$Year==2005,],
+        index=c("Origin"),
+        vSize="n",
+        vColor = "n",
+        type="value",title = "Cancellations by Airports in 2005", 
+        title.legend = "Number of Cancellations")
+treemap(airport[airport$Year==2008,],
+        index=c("Origin"),
+        vSize="n",
+        vColor = "n",
+        type="value",title = "Cancellations by Airports in 2008", 
+        title.legend = "Number of Cancellations")
+
+# 100*sum(airline[airline$Origin=="ORD"& airline$Year == 2005, "Cancelled" ])/sum(airline$Origin == "ORD"& airline$Year == 2005)
+# 100*sum(airline[airline$Origin=="ATL"& airline$Year == 2005, "Cancelled" ])/sum(airline$Origin == "ATL"& airline$Year == 2005)
+# 100*sum(airline[airline$Origin=="ORD"& airline$Year == 2008, "Cancelled" ])/sum(airline$Origin == "ORD"& airline$Year == 2008)
+# 100*sum(airline[airline$Origin=="DFW"& airline$Year == 2008, "Cancelled" ])/sum(airline$Origin == "DFW"& airline$Year == 2008)
+```
+
